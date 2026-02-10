@@ -1,68 +1,178 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Bingo Admin</title>
+    <title>Bingo 活動後台</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        body { font-family: sans-serif; display: flex; gap: 20px; padding: 20px; }
-        .panel { flex: 1; border: 1px solid #ccc; padding: 15px; }
-        .big-number { font-size: 80px; color: red; font-weight: bold; text-align: center; }
-        .num-btn { padding: 5px; width: 30px; margin: 2px; cursor: pointer; }
-        .drawn { background: #555; color: white; }
-        .status-bingo { color: red; font-weight: bold; animation: blink 1s infinite; }
-        .status-reach { color: orange; font-weight: bold; }
-        @keyframes blink { 50% { opacity: 0; } }
+        body { font-family: "Microsoft JhengHei", sans-serif; display: flex; gap: 20px; padding: 20px; background-color: #f0f2f5; height: 95vh; margin: 0; }
+        
+        /* 左側控制區 */
+        .control-panel { 
+            flex: 1; background: white; padding: 20px; border-radius: 15px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        
+        /* 右側排行榜 */
+        .leaderboard-panel { 
+            flex: 1; background: white; padding: 20px; border-radius: 15px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow-y: auto; 
+        }
+
+        .big-number { 
+            font-size: 180px; color: #2c3e50; font-weight: bold; margin: 20px 0; 
+            line-height: 1; text-shadow: 2px 2px 0px #eee;
+        }
+        
+        button { cursor: pointer; border: none; border-radius: 8px; font-weight: bold; transition: 0.2s; }
+        button:active { transform: scale(0.98); }
+
+        .btn-draw { 
+            background: #3498db; color: white; font-size: 28px; padding: 20px 50px; 
+            box-shadow: 0 4px #2980b9; margin-bottom: 20px;
+        }
+        .btn-reset { 
+            background: #e74c3c; color: white; font-size: 16px; padding: 10px 20px; margin-top: auto; 
+        }
+        .btn-qr {
+            background: #2ecc71; color: white; font-size: 18px; padding: 10px 25px; margin-bottom: 15px;
+        }
+
+        /* QR Code 區域 (預設隱藏) */
+        #qr-area { display: none; text-align: center; margin: 20px; padding: 20px; border: 2px dashed #ccc; border-radius: 10px; }
+        #join-link { word-break: break-all; color: #7f8c8d; margin-top: 10px; font-size: 12px; }
+
+        /* 排行榜樣式 */
+        ul { list-style: none; padding: 0; width: 100%; }
+        li { 
+            padding: 15px; margin-bottom: 10px; background: #f8f9fa; border-radius: 8px; 
+            display: flex; justify-content: space-between; align-items: center; font-size: 18px;
+        }
+        
+        /* 狀態特效 */
+        .status-bingo { 
+            background: #e74c3c !important; color: white; animation: pulse 0.5s infinite alternate; 
+            font-weight: bold; font-size: 22px;
+        }
+        .status-reach { 
+            background: #f1c40f !important; color: #333; border: 2px solid #f39c12; 
+            font-weight: bold;
+        }
+        
+        @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.02); } }
+
+        .count-display { font-size: 24px; color: #7f8c8d; margin-bottom: 20px; }
+        .count-num { color: #2c3e50; font-weight: bold; font-size: 32px; }
     </style>
 </head>
 <body>
-    <div class="panel">
-        <h2>QR Code 入口</h2>
-        <div id="qrcode"></div>
-        <p id="join-link"></p>
-        <hr>
-        <h3>目前號碼: <span class="big-number" id="current-num">--</span></h3>
-        <button onclick="drawRandom()" style="font-size: 20px;">隨機開號</button>
-        <button onclick="resetGame()" style="background:red; color:white;">重置</button>
-        <div id="cheat-panel" style="margin-top:10px;"></div>
+
+    <div class="control-panel">
+        <div class="count-display">目前玩家數: <span id="p-count" class="count-num">0</span> 人</div>
+        
+        <button class="btn-qr" onclick="toggleQR()">📱 顯示/隱藏 QR Code</button>
+        <div id="qr-area">
+            <div id="qrcode"></div>
+            <p id="join-link"></p>
+        </div>
+
+        <div>當前開出號碼</div>
+        <div class="big-number" id="current-num">--</div>
+        
+        <button class="btn-draw" onclick="drawRandom()">🎲 隨機開號</button>
+        <button class="btn-reset" onclick="resetGame()">⚠️ 重置遊戲</button>
     </div>
-    <div class="panel">
-        <h2>排行榜 (<span id="p-count">0</span>人)</h2>
-        <ul id="leaderboard"></ul>
+
+    <div class="leaderboard-panel">
+        <h2 style="text-align:center; border-bottom: 2px solid #eee; padding-bottom: 10px;">🏆 即時戰況</h2>
+        <ul id="leaderboard">
+            </ul>
     </div>
+
     <script>
         const socket = io();
         let drawnNumbers = [];
+
+        // QR Code 初始化
         const host = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':'+window.location.port : '');
         const playUrl = host + "/play";
         document.getElementById('join-link').innerText = playUrl;
-        new QRCode(document.getElementById("qrcode"), playUrl);
+        new QRCode(document.getElementById("qrcode"), {
+            text: playUrl,
+            width: 200,
+            height: 200
+        });
 
-        const cheatPanel = document.getElementById('cheat-panel');
-        for(let i=1; i<=75; i++){
-            let btn = document.createElement('button');
-            btn.className = 'num-btn'; btn.innerText = i; btn.id = 'btn-'+i;
-            btn.onclick = () => socket.emit('draw_number', {number: i});
-            cheatPanel.appendChild(btn);
+        // 切換 QR Code 顯示
+        function toggleQR() {
+            const qrArea = document.getElementById('qr-area');
+            if (qrArea.style.display === 'none' || qrArea.style.display === '') {
+                qrArea.style.display = 'block';
+            } else {
+                qrArea.style.display = 'none';
+            }
         }
 
+        // 隨機開號邏輯
         function drawRandom() {
             let available = [];
-            for(let i=1; i<=75; i++) if(!drawnNumbers.includes(i)) available.push(i);
-            if(available.length > 0) socket.emit('draw_number', {number: available[Math.floor(Math.random() * available.length)]});
-        }
-        function resetGame() { if(confirm("重置?")) socket.emit('reset_game'); }
+            for(let i=1; i<=75; i++) {
+                if(!drawnNumbers.includes(i)) available.push(i);
+            }
+            if(available.length > 0) {
+                // 做一個簡單的動畫效果 (假裝在跑)
+                let tempRun = setInterval(() => {
+                    document.getElementById('current-num').innerText = Math.floor(Math.random() * 75) + 1;
+                }, 50);
 
+                setTimeout(() => {
+                    clearInterval(tempRun);
+                    let num = available[Math.floor(Math.random() * available.length)];
+                    socket.emit('draw_number', {number: num});
+                }, 500); // 跑0.5秒後送出
+            } else {
+                alert("所有號碼都開完了！");
+            }
+        }
+
+        function resetGame() {
+            if(confirm("確定要踢除所有玩家並重置遊戲嗎？")) socket.emit('reset_game');
+        }
+
+        // 接收伺服器更新
         socket.on('admin_update', (data) => {
+            // 更新人數
             document.getElementById('p-count').innerText = data.count;
+            
+            // 更新號碼
             drawnNumbers = data.drawn;
-            document.getElementById('current-num').innerText = drawnNumbers.length ? drawnNumbers[drawnNumbers.length-1] : "--";
-            document.querySelectorAll('.num-btn').forEach(b => b.classList.remove('drawn'));
-            drawnNumbers.forEach(n => document.getElementById('btn-'+n)?.classList.add('drawn'));
-            const list = document.getElementById('leaderboard'); list.innerHTML = "";
-            data.players.forEach(p => {
-                let s = p.status === "BINGO" ? "<span class='status-bingo'>[BINGO]</span>" : (p.status === "REACH" ? "<span class='status-reach'>[聽牌]</span>" : "");
-                list.innerHTML += `<li><strong>${p.name}</strong> ${s}</li>`;
+            if(drawnNumbers.length > 0)
+                document.getElementById('current-num').innerText = drawnNumbers[drawnNumbers.length-1];
+            else
+                document.getElementById('current-num').innerText = "--";
+
+            // 更新排行榜
+            const list = document.getElementById('leaderboard');
+            list.innerHTML = "";
+            
+            // 讓聽牌的人排在 Bingo 後面，但在普通人前面
+            data.players.forEach((p, index) => {
+                let li = document.createElement('li');
+                let statusHtml = '<span style="color:#95a5a6">等待中...</span>';
+                
+                if(p.status === "BINGO") {
+                    li.classList.add('status-bingo');
+                    statusHtml = '🎉 BINGO!';
+                } else if(p.status === "REACH") {
+                    li.classList.add('status-reach');
+                    statusHtml = '🔥 聽牌!';
+                }
+                
+                li.innerHTML = `
+                    <span>#${index + 1} <strong>${p.name}</strong></span>
+                    <span>${statusHtml}</span>
+                `;
+                list.appendChild(li);
             });
         });
     </script>
