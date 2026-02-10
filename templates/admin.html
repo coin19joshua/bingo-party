@@ -6,158 +6,56 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Microsoft JhengHei', sans-serif;
-            background-color: #121212;
-            color: #ecf0f1;
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            overflow: hidden;
-        }
-
+        body { font-family: 'Microsoft JhengHei', sans-serif; background-color: #121212; color: #ecf0f1; margin: 0; height: 100vh; display: flex; overflow: hidden; }
+        
         /* 左側主控區 */
-        .left-panel {
-            width: 45%;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid #333;
-            background: #1e1e1e;
-        }
-
+        .left-panel { width: 45%; padding: 20px; display: flex; flex-direction: column; border-right: 1px solid #333; background: #1e1e1e; position: relative; }
+        
         /* 右側資訊區 */
-        .right-panel {
-            width: 55%;
-            padding: 20px;
-            background: #121212;
-            display: flex;
-            flex-direction: column;
-        }
-
+        .right-panel { width: 55%; padding: 20px; background: #121212; display: flex; flex-direction: column; }
+        
         /* 頂部資訊列 */
-        .header-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding: 10px;
-            background: #2c2c2c;
-            border-radius: 8px;
-        }
+        .header-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 10px; background: #2c2c2c; border-radius: 8px; }
         .player-count { color: #00e676; font-size: 24px; font-weight: bold; }
         
         /* 當前號碼大顯示 */
-        .number-display {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #000;
-            border: 5px solid #2980b9;
-            border-radius: 20px;
-            margin: 10px 0;
-            position: relative;
-        }
-        .big-number {
-            font-family: 'Roboto Mono', monospace;
-            font-size: 15vw; /* 響應式字體 */
-            color: #3498db;
-            text-shadow: 0 0 20px rgba(52, 152, 219, 0.5);
-            margin: 0;
-        }
+        .number-display { flex: 1; display: flex; align-items: center; justify-content: center; background: #000; border: 5px solid #2980b9; border-radius: 20px; margin: 10px 0; }
+        .big-number { font-family: 'Roboto Mono', monospace; font-size: 15vw; color: #3498db; text-shadow: 0 0 20px rgba(52, 152, 219, 0.5); margin: 0; }
 
-        /* 控制按鈕 */
-        .btn-draw {
-            padding: 20px;
-            font-size: 28px;
-            background: linear-gradient(135deg, #2980b9, #3498db);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 10px;
-            font-weight: bold;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        }
-        .btn-draw:disabled { background: #555; color: #aaa; cursor: not-allowed; }
+        /* 按鈕樣式 */
+        button { cursor: pointer; transition: 0.2s; }
+        button:active { transform: scale(0.98); }
         
-        .btn-qr {
-            background: #f39c12; border: none; padding: 8px 15px; 
-            border-radius: 5px; cursor: pointer; color: white; font-weight: bold;
-        }
+        .btn-draw { padding: 20px; font-size: 28px; background: linear-gradient(135deg, #2980b9, #3498db); color: white; border: none; border-radius: 10px; width: 100%; margin-top: 10px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .btn-draw:disabled { background: #555; color: #aaa; cursor: not-allowed; box-shadow: none; }
+        
+        .btn-reset { width: 100%; margin-top: 15px; padding: 15px; background: transparent; border: 2px solid #e74c3c; color: #e74c3c; border-radius: 10px; font-weight: bold; font-size: 18px; }
+        .btn-reset:hover { background: #e74c3c; color: white; }
+
+        .btn-qr { background: #f39c12; border: none; padding: 8px 15px; border-radius: 5px; color: white; font-weight: bold; }
 
         /* 歷史紀錄區 */
-        .history-section {
-            margin-top: auto;
-            padding-top: 10px;
-            border-top: 1px solid #444;
-        }
-        .history-title { font-size: 14px; color: #888; margin-bottom: 5px; }
-        .history-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            max-height: 100px;
-            overflow-y: auto;
-        }
-        .hist-ball {
-            width: 35px; height: 35px;
-            background: #333;
-            border-radius: 50%;
-            display: flex; justify-content: center; align-items: center;
-            font-size: 16px; color: #ddd;
-            border: 1px solid #555;
-        }
+        .history-section { margin-top: auto; padding-top: 10px; border-top: 1px solid #444; }
+        .history-list { display: flex; flex-wrap: wrap; gap: 8px; max-height: 100px; overflow-y: auto; }
+        .hist-ball { width: 35px; height: 35px; background: #333; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 16px; color: #ddd; border: 1px solid #555; }
         .hist-ball.latest { border-color: #3498db; color: #3498db; font-weight: bold; }
 
         /* 排行榜 */
-        .leaderboard-container {
-            flex: 1;
-            overflow-y: auto;
-        }
-        .lb-row {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 15px; margin-bottom: 8px; background: #2c2c2c;
-            border-radius: 8px; font-size: 20px;
-        }
-        .lb-reach { background: #d35400; border-left: 8px solid #e67e22; animation: blink 1s infinite; }
-        .lb-bingo { background: #c0392b; color: white; border-left: 8px solid #e74c3c; }
+        .leaderboard-container { flex: 1; overflow-y: auto; padding-right: 5px; }
+        .lb-row { display: flex; justify-content: space-between; align-items: center; padding: 15px; margin-bottom: 8px; background: #2c2c2c; border-radius: 8px; font-size: 20px; }
+        
+        /* ★ 聽牌與中獎特效 ★ */
+        .lb-reach { background: #d35400 !important; border-left: 8px solid #e67e22; animation: blink 1s infinite; }
+        .lb-bingo { background: #c0392b !important; color: white; border-left: 8px solid #e74c3c; }
         @keyframes blink { 50% { opacity: 0.8; } }
 
-        /* QR Code 彈窗 (置中懸浮) */
-        .modal-overlay {
-            display: none;
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 2000; /* 保證在最上層 */
-            justify-content: center; align-items: center;
-            flex-direction: column;
-        }
-        .modal-content {
-            background: white; padding: 30px; border-radius: 15px; text-align: center;
-            box-shadow: 0 0 30px rgba(0,0,0,0.9);
-        }
-        .close-modal {
-            margin-top: 20px; padding: 10px 30px; background: #e74c3c; 
-            color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 18px;
-        }
-
-        /* 遊戲結束 全螢幕特效 */
-        #game-over-screen {
-            display: none; /* JS控制 */
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.95);
-            z-index: 3000; /* 最高層級 */
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
+        /* 彈窗們 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; flex-direction: column; }
+        .modal-content { background: white; padding: 30px; border-radius: 15px; text-align: center; box-shadow: 0 0 30px rgba(0,0,0,0.9); }
+        
+        #game-over-screen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 3000; flex-direction: column; align-items: center; justify-content: center; }
         .winner-title { font-size: 50px; color: #f1c40f; margin-bottom: 20px; text-shadow: 0 0 20px #f1c40f; }
-        .winner-name { font-size: 80px; color: white; font-weight: bold; animation: pop 0.5s; text-align: center;}
-        @keyframes pop { 0% { transform: scale(0.5); } 100% { transform: scale(1); } }
-
+        .winner-name { font-size: 80px; color: white; font-weight: bold; text-align: center; }
     </style>
 </head>
 <body>
@@ -166,20 +64,19 @@
         <div class="modal-content">
             <div id="qrcode"></div>
             <p style="color:black; margin-top:10px; font-weight:bold;">掃描加入遊戲</p>
-            <p id="join-url" style="color:#666; font-size:12px;"></p>
-            <button class="close-modal" onclick="toggleQR()">關閉</button>
+            <button onclick="toggleQR()" style="margin-top:20px; padding:10px 30px; background:#e74c3c; color:white; border:none; border-radius:5px; font-size:16px;">關閉</button>
         </div>
     </div>
 
     <div id="game-over-screen">
         <div class="winner-title">🎉 BINGO! 恭喜中獎 🎉</div>
         <div class="winner-name" id="winner-list">???</div>
-        <button class="close-modal" onclick="resetGame()" style="margin-top:50px; background: transparent; border: 2px solid white;">🔄 重置並開始新局</button>
+        <button onclick="resetGame()" style="margin-top:50px; padding:15px 40px; font-size:24px; background:transparent; border:2px solid white; color:white; border-radius:50px;">🔄 開啟下一局</button>
     </div>
 
     <div class="left-panel">
         <div class="header-info">
-            <button class="btn-qr" onclick="toggleQR()">📱 顯示 QR Code</button>
+            <button class="btn-qr" onclick="toggleQR()">📱 QR Code</button>
             <div style="font-size:14px; color:#aaa;">狀態: <span id="conn-status" style="color:red">● 未連線</span></div>
         </div>
 
@@ -188,11 +85,11 @@
         </div>
 
         <button id="draw-btn" class="btn-draw" onclick="requestDraw()">🎲 開 獎</button>
+        <button class="btn-reset" onclick="resetGame()">🔄 強制開啟下一局</button>
 
         <div class="history-section">
-            <div class="history-title">歷史號碼 (由新到舊)</div>
-            <div class="history-list" id="history-box">
-                </div>
+            <div style="color:#888; font-size:12px; margin-bottom:5px;">歷史紀錄 (由新到舊)</div>
+            <div class="history-list" id="history-box"></div>
         </div>
     </div>
 
@@ -211,73 +108,49 @@
         let isRolling = false;
         let rollInterval;
 
-        // 連線狀態監測
-        socket.on('connect', () => {
-            document.getElementById('conn-status').innerHTML = "● 已連線";
-            document.getElementById('conn-status').style.color = "#00e676";
-        });
-        socket.on('disconnect', () => {
-            document.getElementById('conn-status').innerHTML = "● 斷線中";
-            document.getElementById('conn-status').style.color = "red";
-        });
+        socket.on('connect', () => { document.getElementById('conn-status').innerHTML = "● 已連線"; document.getElementById('conn-status').style.color = "#00e676"; });
+        socket.on('disconnect', () => { document.getElementById('conn-status').innerHTML = "● 斷線中"; document.getElementById('conn-status').style.color = "red"; });
 
-        // QR Code
         const host = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':'+window.location.port : '');
-        const playUrl = host + "/play";
-        document.getElementById('join-url').innerText = playUrl;
-        new QRCode(document.getElementById("qrcode"), { text: playUrl, width: 250, height: 250 });
+        new QRCode(document.getElementById("qrcode"), { text: host + "/play", width: 250, height: 250 });
 
         function toggleQR() {
             const modal = document.getElementById('qr-modal');
             modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
         }
 
-        // 請求開獎 (不再自己算數字，改為叫伺服器算)
         function requestDraw() {
             if(isRolling) return;
             isRolling = true;
             document.getElementById('draw-btn').disabled = true;
-            
-            // 視覺動畫 (假裝在跑)
-            rollInterval = setInterval(() => {
-                document.getElementById('current-num').innerText = Math.floor(Math.random() * 75) + 1;
-            }, 50);
-
-            // 發送請求
+            rollInterval = setInterval(() => { document.getElementById('current-num').innerText = Math.floor(Math.random() * 75) + 1; }, 50);
             socket.emit('request_draw');
         }
 
         function resetGame() {
-            if(confirm("確定重置遊戲？")) {
+            if(confirm("確定要結束本局並開始下一局嗎？\n(所有玩家將被踢出並重置)")) {
                 socket.emit('reset_game');
                 document.getElementById('game-over-screen').style.display = 'none';
             }
         }
 
-        // --- 接收伺服器訊號 ---
-
-        // 1. 收到正式號碼 (停止動畫，顯示真數字)
         socket.on('number_drawn', (data) => {
-            clearInterval(rollInterval); // 停止亂跳
-            isRolling = false;
+            clearInterval(rollInterval); isRolling = false;
             document.getElementById('current-num').innerText = data.number;
             document.getElementById('draw-btn').disabled = false;
         });
 
-        // 2. 收到完整後台資訊更新 (包含人數、歷史、排行榜)
         socket.on('admin_update', (data) => {
             // 更新人數
             document.getElementById('p-count').innerText = data.count;
 
-            // 更新歷史紀錄
+            // 更新歷史
             const histBox = document.getElementById('history-box');
             histBox.innerHTML = "";
-            // 反轉陣列，讓最新的在前面
-            let reversedDrawn = [...data.drawn].reverse();
-            reversedDrawn.forEach((num, index) => {
+            [...data.drawn].reverse().forEach((num, index) => {
                 let div = document.createElement('div');
                 div.className = 'hist-ball';
-                if(index === 0) div.classList.add('latest'); // 最新那顆亮一點
+                if(index === 0) div.classList.add('latest');
                 div.innerText = num;
                 histBox.appendChild(div);
             });
@@ -286,46 +159,41 @@
             const lb = document.getElementById('leaderboard');
             lb.innerHTML = "";
             
-            // 篩選：只顯示有進度的玩家 (聽牌或Bingo)
-            let activePlayers = data.players.filter(p => p.status !== 'NORMAL');
+            // 篩選：只顯示有進度的人
+            let activePlayers = data.players.filter(p => p.status === 'REACH' || p.status === 'BINGO');
             
             if(activePlayers.length === 0) {
-                lb.innerHTML = "<div style='text-align:center; color:#555; margin-top:50px;'>一切風平浪靜...</div>";
+                lb.innerHTML = "<div style='text-align:center; color:#555; margin-top:50px;'>等待聽牌...</div>";
             } else {
                 activePlayers.forEach(p => {
                     let div = document.createElement('div');
-                    div.className = 'lb-row';
-                    let statusHtml = "";
-                    if(p.status === "REACH") {
-                        div.classList.add('lb-reach');
-                        statusHtml = "🔥 聽牌";
-                    } else if(p.status === "BINGO") {
-                        div.classList.add('lb-bingo');
-                        statusHtml = "🎉 BINGO!";
+                    // ★ 這裡確保 CSS class 正確套用
+                    let cssClass = 'lb-row';
+                    let statusText = '';
+                    
+                    if(p.status === 'REACH') {
+                        cssClass += ' lb-reach';
+                        statusText = '🔥 聽牌';
+                    } else if(p.status === 'BINGO') {
+                        cssClass += ' lb-bingo';
+                        statusText = '🎉 BINGO!';
                     }
-                    div.innerHTML = `<span>${p.name}</span><span>${statusHtml}</span>`;
+                    
+                    div.className = cssClass;
+                    div.innerHTML = `<span>${p.name}</span><span>${statusText}</span>`;
                     lb.appendChild(div);
                 });
             }
         });
 
-        // 3. 遊戲結束 (BINGO 彈窗)
         socket.on('game_over', (data) => {
-            clearInterval(rollInterval); // 確保動畫停止
-            isRolling = false;
+            clearInterval(rollInterval); isRolling = false;
             document.getElementById('draw-btn').disabled = true;
-            
-            // 顯示中獎者
-            const screen = document.getElementById('game-over-screen');
-            screen.style.display = 'flex';
+            document.getElementById('game-over-screen').style.display = 'flex';
             document.getElementById('winner-list').innerText = data.winners.join(" & ");
         });
 
-        // 4. 重置
-        socket.on('game_reset', () => {
-             location.reload(); // 後台直接重整最乾淨
-        });
-
+        socket.on('game_reset', () => { location.reload(); });
     </script>
 </body>
 </html>
