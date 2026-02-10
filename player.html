@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bingo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 10px; }
+        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; max-width: 400px; margin: 0 auto; }
+        .cell { aspect-ratio: 1; border: 1px solid #ccc; display: flex; justify-content: center; align-items: center; font-weight: bold; }
+        .marked { background: #4CAF50; color: white; }
+        .bingo-bg { background-color: #ffeb3b !important; }
+    </style>
+</head>
+<body>
+    <div id="login-screen">
+        <h1>Bingo</h1>
+        <input type="text" id="nickname" placeholder="暱稱"><br><br>
+        <button onclick="joinGame()">加入</button>
+    </div>
+    <div id="game-screen" style="display:none;">
+        <h2 id="player-name"></h2>
+        <div id="status">等待開獎...</div>
+        <div class="grid" id="card"></div>
+    </div>
+    <script>
+        const socket = io();
+        function joinGame() {
+            const name = document.getElementById('nickname').value;
+            if(!name) return;
+            document.getElementById('player-name').innerText = name;
+            socket.emit('join_game', {nickname: name});
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+        }
+        socket.on('init_game', (data) => {
+            const grid = document.getElementById('card'); grid.innerHTML = "";
+            data.card.forEach(row => row.forEach(n => {
+                let d = document.createElement('div'); d.className = 'cell'; 
+                d.innerText = n===0 ? '★' : n; d.id = 'num-'+n;
+                if(n===0 || data.drawn.includes(n)) d.classList.add('marked');
+                grid.appendChild(d);
+            }));
+        });
+        socket.on('update_status', (data) => {
+            document.getElementById('num-'+data.new_number)?.classList.add('marked');
+            let s = document.getElementById('status');
+            if(data.status==="BINGO") { s.innerText = "BINGO!"; document.body.classList.add('bingo-bg'); }
+            else if(data.status==="REACH") { s.innerText = "聽牌!"; s.style.color = "orange"; }
+            else { s.innerText = "最新: " + data.new_number; }
+        });
+        socket.on('game_reset', () => location.reload());
+    </script>
+</body>
+</html>

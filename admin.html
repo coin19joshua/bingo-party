@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bingo Admin</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body { font-family: sans-serif; display: flex; gap: 20px; padding: 20px; }
+        .panel { flex: 1; border: 1px solid #ccc; padding: 15px; }
+        .big-number { font-size: 80px; color: red; font-weight: bold; text-align: center; }
+        .num-btn { padding: 5px; width: 30px; margin: 2px; cursor: pointer; }
+        .drawn { background: #555; color: white; }
+        .status-bingo { color: red; font-weight: bold; animation: blink 1s infinite; }
+        .status-reach { color: orange; font-weight: bold; }
+        @keyframes blink { 50% { opacity: 0; } }
+    </style>
+</head>
+<body>
+    <div class="panel">
+        <h2>QR Code 入口</h2>
+        <div id="qrcode"></div>
+        <p id="join-link"></p>
+        <hr>
+        <h3>目前號碼: <span class="big-number" id="current-num">--</span></h3>
+        <button onclick="drawRandom()" style="font-size: 20px;">隨機開號</button>
+        <button onclick="resetGame()" style="background:red; color:white;">重置</button>
+        <div id="cheat-panel" style="margin-top:10px;"></div>
+    </div>
+    <div class="panel">
+        <h2>排行榜 (<span id="p-count">0</span>人)</h2>
+        <ul id="leaderboard"></ul>
+    </div>
+    <script>
+        const socket = io();
+        let drawnNumbers = [];
+        const host = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':'+window.location.port : '');
+        const playUrl = host + "/play";
+        document.getElementById('join-link').innerText = playUrl;
+        new QRCode(document.getElementById("qrcode"), playUrl);
+
+        const cheatPanel = document.getElementById('cheat-panel');
+        for(let i=1; i<=75; i++){
+            let btn = document.createElement('button');
+            btn.className = 'num-btn'; btn.innerText = i; btn.id = 'btn-'+i;
+            btn.onclick = () => socket.emit('draw_number', {number: i});
+            cheatPanel.appendChild(btn);
+        }
+
+        function drawRandom() {
+            let available = [];
+            for(let i=1; i<=75; i++) if(!drawnNumbers.includes(i)) available.push(i);
+            if(available.length > 0) socket.emit('draw_number', {number: available[Math.floor(Math.random() * available.length)]});
+        }
+        function resetGame() { if(confirm("重置?")) socket.emit('reset_game'); }
+
+        socket.on('admin_update', (data) => {
+            document.getElementById('p-count').innerText = data.count;
+            drawnNumbers = data.drawn;
+            document.getElementById('current-num').innerText = drawnNumbers.length ? drawnNumbers[drawnNumbers.length-1] : "--";
+            document.querySelectorAll('.num-btn').forEach(b => b.classList.remove('drawn'));
+            drawnNumbers.forEach(n => document.getElementById('btn-'+n)?.classList.add('drawn'));
+            const list = document.getElementById('leaderboard'); list.innerHTML = "";
+            data.players.forEach(p => {
+                let s = p.status === "BINGO" ? "<span class='status-bingo'>[BINGO]</span>" : (p.status === "REACH" ? "<span class='status-reach'>[聽牌]</span>" : "");
+                list.innerHTML += `<li><strong>${p.name}</strong> ${s}</li>`;
+            });
+        });
+    </script>
+</body>
+</html>
