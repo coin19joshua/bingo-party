@@ -5,14 +5,13 @@ import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'secret!')
-# 使用 eventlet 以支援高併發與即時性
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # 遊戲核心數據
 game_state = {
-    "status": "PLAYING", # PLAYING (進行中), ENDED (有人中獎)
-    "drawn_numbers": [], # 已經開出的號碼
-    "players": {}        # 所有玩家資料
+    "status": "PLAYING", 
+    "drawn_numbers": [], 
+    "players": {} 
 }
 
 def generate_card():
@@ -23,7 +22,6 @@ def generate_card():
     return card
 
 def check_player_status(card, drawn):
-    # 檢查 5x5 矩陣的連線狀態
     lines = []
     # 橫列 & 直列
     for i in range(5):
@@ -41,8 +39,11 @@ def check_player_status(card, drawn):
         for num in line:
             if num == 0 or num in drawn:
                 matches += 1
-        if matches == 5: is_bingo = True
-        elif matches == 4: is_reach = True
+        
+        if matches == 5:
+            is_bingo = True
+        elif matches == 4:
+            is_reach = True
             
     if is_bingo: return "BINGO"
     if is_reach: return "REACH"
@@ -60,57 +61,46 @@ def admin():
 def play():
     return render_template('player.html')
 
-# --- WebSocket 事件處理 ---
+# --- WebSocket 事件 ---
 
 @socketio.on('join_game')
 def handle_join(data):
     if game_state['status'] == 'ENDED':
-        emit('error', {'msg': '遊戲已結束'})
+        emit('error', {'msg': '遊戲已結束，等待下一局'})
         return
 
     nickname = data.get('nickname', 'Guest')
     card = generate_card()
     
-    # 記錄玩家
+    # 儲存玩家
     game_state['players'][request.sid] = {
         "name": nickname,
         "card": card,
         "status": "NORMAL"
     }
     
-    # 回傳卡片給玩家
     emit('init_game', {"card": card, "drawn": game_state['drawn_numbers']})
-    
-    # **關鍵**：有人加入，立刻通知後台更新人數
+    # ★ 修復：有人加入，強制廣播最新人數給後台
     update_admin_full()
 
 @socketio.on('disconnect')
 def handle_disconnect():
     if request.sid in game_state['players']:
         del game_state['players'][request.sid]
-        # **關鍵**：有人離開，立刻通知後台更新人數
+        # ★ 修復：有人斷線，強制廣播最新人數給後台
         update_admin_full()
 
 @socketio.on('request_draw')
 def handle_draw_request():
-    """
-    這是新的邏輯：
-    1. 後台發送 'request_draw'
-    2. 伺服器計算號碼
-    3. 伺服器廣播 'number_drawn'
-    """
     if game_state['status'] == 'ENDED':
         return
 
-    # 計算剩餘號碼
     all_nums = set(range(1, 76))
     drawn_set = set(game_state['drawn_numbers'])
     available = list(all_nums - drawn_set)
 
-    if not available:
-        return # 沒號碼了
+    if not available: return
 
-    # 伺服器決定號碼 (保證唯一真理)
     new_number = random.choice(available)
     game_state['drawn_numbers'].append(new_number)
     
@@ -124,37 +114,34 @@ def handle_draw_request():
         if status == "BINGO":
             winners.append(player['name'])
         
-        # 通知玩家手機
         emit('update_status', {"status": status, "new_number": new_number}, room=sid)
 
-    # 廣播號碼給所有人 (包含後台)
     emit('number_drawn', {"number": new_number}, broadcast=True)
     
-    # 檢查是否有人贏了
     if len(winners) > 0:
         game_state['status'] = 'ENDED'
         socketio.emit('game_over', {"winners": winners}, broadcast=True)
     
-    # 無論如何，更新後台資訊 (包含歷史紀錄)
     update_admin_full()
 
 @socketio.on('reset_game')
 def handle_reset():
+    # ★ 核彈級重置邏輯 ★
     game_state['status'] = 'PLAYING'
     game_state['drawn_numbers'] = []
     
-    # 重置所有玩家
-    for sid in game_state['players']:
-        game_state['players'][sid]['card'] = generate_card()
-        game_state['players'][sid]['status'] = "NORMAL"
-        emit('init_game', {"card": game_state['players'][sid]['card'], "drawn": []}, room=sid)
+    # 1. 先通知所有人「遊戲重置了，快重整！」
+    socketio.emit('game_reset', broadcast=True)
     
-    emit('game_reset', broadcast=True)
+    # 2. 清空伺服器端的所有玩家資料
+    game_state['players'].clear()
+    
+    # 3. 更新後台（這時候人數會變 0）
     update_admin_full()
 
 def update_admin_full():
     leaderboard = []
-    # 只回傳有在玩的人 (狀態是 REACH 或 BINGO 的優先)
+    # 撈取資料
     for p in game_state['players'].values():
         leaderboard.append({"name": p['name'], "status": p['status']})
     
@@ -162,10 +149,13 @@ def update_admin_full():
     status_order = {"BINGO": 0, "REACH": 1, "NORMAL": 2}
     leaderboard.sort(key=lambda x: status_order[x['status']])
     
-    # 發送完整數據給後台
+    # ★ Debug用：在伺服器端印出聽牌人數，確保後端有抓到
+    reach_count = sum(1 for p in leaderboard if p['status'] == 'REACH')
+    print(f"Update Admin: Total {len(leaderboard)}, Reach {reach_count}")
+
     socketio.emit('admin_update', {
         "players": leaderboard,
-        "drawn": game_state['drawn_numbers'], # 歷史號碼
+        "drawn": game_state['drawn_numbers'],
         "count": len(game_state['players']),
         "status": game_state['status']
     }, broadcast=True)
