@@ -5,20 +5,20 @@ import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'secret!')
-# async_mode='eventlet' 對於高併發很重要
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# 遊戲狀態
+# 遊戲數據
 game_state = {
+    "status": "PLAYING", # PLAYING, ENDED
     "drawn_numbers": [],
     "players": {}
 }
 
 def generate_card():
-    # 產生 1-75 不重複的25個數字
+    # 產生 1-75 不重複
     numbers = random.sample(range(1, 76), 25)
     card = [numbers[i:i+5] for i in range(0, 25, 5)]
-    card[2][2] = 0  # Free Space
+    card[2][2] = 0 # Free space
     return card
 
 def check_player_status(card, drawn):
@@ -39,11 +39,8 @@ def check_player_status(card, drawn):
         for num in line:
             if num == 0 or num in drawn:
                 matches += 1
-        
-        if matches == 5:
-            is_bingo = True
-        elif matches == 4:
-            is_reach = True
+        if matches == 5: is_bingo = True
+        elif matches == 4: is_reach = True
             
     if is_bingo: return "BINGO"
     if is_reach: return "REACH"
@@ -61,76 +58,94 @@ def admin():
 def play():
     return render_template('player.html')
 
-# --- Socket 事件 ---
+# --- WebSocket 事件 ---
 
 @socketio.on('join_game')
 def handle_join(data):
+    if game_state['status'] == 'ENDED':
+        emit('error', {'msg': '遊戲已結束'})
+        return
+
     nickname = data.get('nickname', 'Guest')
-    # 每個連線 (sid) 對應一張卡
     card = generate_card()
     game_state['players'][request.sid] = {
         "name": nickname,
         "card": card,
         "status": "NORMAL"
     }
-    # 只回傳給該玩家
     emit('init_game', {"card": card, "drawn": game_state['drawn_numbers']})
-    # 廣播更新後台排行榜
-    update_admin()
+    # 強制廣播更新後台
+    update_admin_full()
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    # 玩家斷線時，從名單移除
     if request.sid in game_state['players']:
         del game_state['players'][request.sid]
-        update_admin()
+        update_admin_full()
 
 @socketio.on('draw_number')
 def handle_draw(data):
-    # 從後台接收隨機號碼
+    # 如果遊戲已經結束，禁止開號
+    if game_state['status'] == 'ENDED':
+        return
+
     number = int(data.get('number'))
     
     if number not in game_state['drawn_numbers']:
         game_state['drawn_numbers'].append(number)
         
-        # 檢查所有玩家狀態
+        winners = []
+        
+        # 檢查所有玩家
         for sid, player in game_state['players'].items():
             status = check_player_status(player['card'], game_state['drawn_numbers'])
             player['status'] = status
-            # 通知玩家你的狀態變了
+            
+            if status == "BINGO":
+                winners.append(player['name'])
+            
+            # 通知個別手機更新
             emit('update_status', {"status": status, "new_number": number}, room=sid)
 
-        # 廣播號碼給全場
+        # 廣播號碼
         emit('number_drawn', {"number": number}, broadcast=True)
-        # 更新後台
-        update_admin()
+        
+        # 判斷是否有人贏了
+        if len(winners) > 0:
+            game_state['status'] = 'ENDED'
+            # 發送遊戲結束訊號給後台
+            socketio.emit('game_over', {"winners": winners}, broadcast=True)
+        else:
+            # 沒人贏，更新後台排行榜
+            update_admin_full()
 
 @socketio.on('reset_game')
 def handle_reset():
+    game_state['status'] = 'PLAYING'
     game_state['drawn_numbers'] = []
-    # 重置所有玩家的卡片
+    # 重置所有玩家
     for sid in game_state['players']:
         game_state['players'][sid]['card'] = generate_card()
         game_state['players'][sid]['status'] = "NORMAL"
         emit('init_game', {"card": game_state['players'][sid]['card'], "drawn": []}, room=sid)
     
     emit('game_reset', broadcast=True)
-    update_admin()
+    update_admin_full()
 
-def update_admin():
-    # 整理數據給後台
+def update_admin_full():
     leaderboard = []
     for p in game_state['players'].values():
         leaderboard.append({"name": p['name'], "status": p['status']})
     
-    # 排序邏輯: Bingo(0) > Reach(1) > Normal(2)
+    # 排序：Bingo > Reach > Normal
     status_order = {"BINGO": 0, "REACH": 1, "NORMAL": 2}
     leaderboard.sort(key=lambda x: status_order[x['status']])
     
     socketio.emit('admin_update', {
         "players": leaderboard,
         "drawn": game_state['drawn_numbers'],
-        "count": len(game_state['players'])
+        "count": len(game_state['players']),
+        "status": game_state['status']
     }, broadcast=True)
 
 if __name__ == '__main__':
