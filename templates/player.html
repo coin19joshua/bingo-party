@@ -7,193 +7,35 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
     <style>
+        /* 保持原本漂亮的樣式 */
         * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
-        body {
-            font-family: 'Microsoft JhengHei', sans-serif;
-            background-color: #121212;
-            color: #fff;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        /* --- 登入畫面 --- */
-        #login-screen {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            height: 100%;
-            padding: 30px;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            z-index: 10;
-        }
-        .logo-title {
-            font-size: 40px;
-            font-weight: bold;
-            margin-bottom: 40px;
-            text-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            letter-spacing: 2px;
-        }
-        input#nickname {
-            width: 100%;
-            max-width: 300px;
-            padding: 15px;
-            font-size: 24px; /* 字體加大 */
-            border: none;
-            border-radius: 50px;
-            text-align: center;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            outline: none;
-        }
-        input#nickname:focus {
-            transform: scale(1.05);
-            transition: 0.2s;
-        }
-        button.btn-join {
-            width: 100%;
-            max-width: 300px;
-            padding: 15px;
-            font-size: 24px;
-            background: #00e676; /* 鮮豔綠 */
-            color: #004d40;
-            border: none;
-            border-radius: 50px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0,230,118, 0.4);
-            transition: 0.2s;
-        }
-        button.btn-join:active { transform: scale(0.95); }
-
-        /* --- 遊戲畫面 --- */
-        #game-screen {
-            display: none;
-            width: 100%;
-            height: 100%;
-            flex-direction: column;
-            align-items: center;
-            padding: 10px;
-            max-width: 500px; /* 手機最大寬度限制 */
-        }
-
-        /* 頂部資訊列 */
-        .top-bar {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 15px;
-            background: #1e1e1e;
-            border-radius: 15px;
-            margin-bottom: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        }
-        .player-name { font-size: 18px; color: #aaa; }
-        .status-badge {
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: bold;
-            background: #333;
-            color: #777;
-        }
+        body { font-family: 'Microsoft JhengHei', sans-serif; background-color: #121212; color: #fff; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
+        
+        #login-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; height: 100%; padding: 30px; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); z-index: 10; }
+        .logo-title { font-size: 40px; font-weight: bold; margin-bottom: 40px; letter-spacing: 2px; }
+        input#nickname { width: 100%; max-width: 300px; padding: 15px; font-size: 24px; border: none; border-radius: 50px; text-align: center; margin-bottom: 20px; outline: none; }
+        button.btn-join { width: 100%; max-width: 300px; padding: 15px; font-size: 24px; background: #00e676; color: #004d40; border: none; border-radius: 50px; font-weight: bold; cursor: pointer; }
+        
+        #game-screen { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; padding: 10px; max-width: 500px; }
+        .top-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: #1e1e1e; border-radius: 15px; margin-bottom: 10px; }
+        .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 14px; background: #333; color: #777; }
         .status-badge.reach { background: #ff9800; color: white; animation: blink 1s infinite; }
         .status-badge.bingo { background: #f44336; color: white; }
         @keyframes blink { 50% { opacity: 0.7; } }
-
-        /* 最新號碼顯示 */
-        .latest-number-area {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        .latest-label { font-size: 16px; color: #888; }
-        .latest-ball {
-            width: 60px; height: 60px;
-            border-radius: 50%;
-            background: #2980b9;
-            color: white;
-            font-size: 32px;
-            font-family: 'Roboto Mono', monospace;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 3px solid #3498db;
-            box-shadow: 0 0 15px rgba(52, 152, 219, 0.6);
-        }
-
-        /* Bingo 盤面 */
-        .grid-container {
-            width: 100%;
-            aspect-ratio: 1; /* 保持正方形 */
-            padding: 10px;
-            background: #222;
-            border-radius: 15px;
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 8px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-        }
-        .cell {
-            background: #333;
-            border-radius: 8px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 20px; /* 格子內數字大小 */
-            font-weight: bold;
-            color: #ddd;
-            transition: 0.3s;
-            position: relative;
-        }
-        .cell.free { color: #f1c40f; font-size: 24px; }
         
-        /* 選中特效 */
-        .cell.marked {
-            background: #00e676;
-            color: #004d40;
-            transform: scale(0.95);
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
-        }
-        /* 新選中的號碼閃爍 */
-        .cell.just-marked {
-            animation: pop 0.5s;
-        }
-        @keyframes pop { 
-            0% { transform: scale(1); background: white; } 
-            50% { transform: scale(1.2); } 
-            100% { transform: scale(0.95); background: #00e676; } 
-        }
+        .latest-number-area { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }
+        .latest-ball { width: 60px; height: 60px; border-radius: 50%; background: #2980b9; color: white; font-size: 32px; font-family: 'Roboto Mono', monospace; display: flex; align-items: center; justify-content: center; border: 3px solid #3498db; }
+        
+        .grid-container { width: 100%; aspect-ratio: 1; padding: 10px; background: #222; border-radius: 15px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+        .cell { background: #333; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 20px; font-weight: bold; color: #ddd; transition: 0.3s; }
+        .cell.marked { background: #00e676; color: #004d40; transform: scale(0.95); }
+        .cell.just-marked { animation: pop 0.5s; }
+        @keyframes pop { 0% { transform: scale(1); background: white; } 50% { transform: scale(1.2); } 100% { transform: scale(0.95); background: #00e676; } }
 
-        /* BINGO 全螢幕覆蓋層 */
-        #win-overlay {
-            display: none;
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            z-index: 99;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            animation: fadeIn 0.5s;
-        }
-        .win-text { font-size: 60px; color: #f1c40f; font-weight: bold; text-shadow: 0 0 20px #f1c40f; margin-bottom: 20px;}
-        .win-sub { font-size: 24px; color: white; }
-
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
+        #win-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 99; flex-direction: column; justify-content: center; align-items: center; }
     </style>
 </head>
 <body>
-
     <div id="login-screen">
         <div class="logo-title">BINGO PARTY</div>
         <input type="text" id="nickname" placeholder="輸入你的暱稱" maxlength="8">
@@ -202,59 +44,36 @@
 
     <div id="game-screen">
         <div class="top-bar">
-            <div class="player-name" id="display-name">Player</div>
+            <div style="font-size:18px; color:#aaa;" id="display-name"></div>
             <div class="status-badge" id="status-badge">進行中</div>
         </div>
-
         <div class="latest-number-area">
-            <span class="latest-label">最新號碼</span>
+            <span style="font-size:16px; color:#888;">最新號碼</span>
             <div class="latest-ball" id="latest-num">--</div>
         </div>
-
-        <div class="grid-container" id="bingo-card">
-            </div>
-        
-        <p style="color:#555; font-size:12px; margin-top:20px;">等待主持人開獎...</p>
+        <div class="grid-container" id="bingo-card"></div>
+        <p style="color:#555; font-size:12px; margin-top:20px;">等待開獎...</p>
     </div>
 
     <div id="win-overlay">
-        <div class="win-text">BINGO!</div>
-        <div class="win-sub">恭喜你中獎了！🎉</div>
-        <div class="win-sub" style="font-size:16px; margin-top:20px; color:#aaa;">請向主持人領獎</div>
+        <div style="font-size:60px; color:#f1c40f; font-weight:bold;">BINGO!</div>
+        <div style="font-size:24px; color:white;">恭喜你中獎了！🎉</div>
     </div>
 
     <script>
         const socket = io();
-        let myCard = [];
-
-        // 禁止縮放
-        document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
 
         function joinGame() {
             const name = document.getElementById('nickname').value.trim();
-            if(!name) {
-                alert("請輸入名字！");
-                return;
-            }
-            
+            if(!name) return alert("請輸入名字！");
             document.getElementById('display-name').innerText = name;
             socket.emit('join_game', {nickname: name});
-            
-            // 切換畫面
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('game-screen').style.display = 'flex';
         }
 
-        // 收到卡片數據
-        socket.on('init_game', (data) => {
-            renderCard(data.card, data.drawn);
-        });
-
-        // 錯誤處理 (例如遊戲已結束)
-        socket.on('error', (data) => {
-            alert(data.msg);
-            location.reload();
-        });
+        socket.on('init_game', (data) => { renderCard(data.card, data.drawn); });
+        socket.on('error', (data) => { alert(data.msg); location.reload(); });
 
         function renderCard(card, drawn) {
             const grid = document.getElementById('bingo-card');
@@ -262,56 +81,34 @@
             card.forEach(row => {
                 row.forEach(num => {
                     let div = document.createElement('div');
-                    div.className = 'cell';
-                    div.id = 'cell-' + num;
-                    
-                    if(num === 0) {
-                        div.innerHTML = "★";
-                        div.classList.add('free', 'marked');
-                    } else {
-                        div.innerText = num;
-                        if(drawn.includes(num)) div.classList.add('marked');
-                    }
+                    div.className = 'cell'; div.id = 'cell-' + num;
+                    if(num === 0) { div.innerHTML = "★"; div.classList.add('marked'); }
+                    else { div.innerText = num; if(drawn.includes(num)) div.classList.add('marked'); }
                     grid.appendChild(div);
                 });
             });
         }
 
-        // 更新狀態 (有人開獎)
         socket.on('update_status', (data) => {
-            // 1. 更新最新號碼顯示
             document.getElementById('latest-num').innerText = data.new_number;
-
-            // 2. 標記格子
             let cell = document.getElementById('cell-' + data.new_number);
-            if(cell) {
-                cell.classList.add('marked', 'just-marked');
-                // 震動手機 (如果支援)
-                if(navigator.vibrate) navigator.vibrate(200);
-            }
-
-            // 3. 更新狀態標籤
+            if(cell) { cell.classList.add('marked', 'just-marked'); if(navigator.vibrate) navigator.vibrate(200); }
+            
             const badge = document.getElementById('status-badge');
             if(data.status === "BINGO") {
-                badge.innerText = "BINGO!";
-                badge.className = "status-badge bingo";
+                badge.innerText = "BINGO!"; badge.className = "status-badge bingo";
                 document.getElementById('win-overlay').style.display = 'flex';
                 if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
             } else if(data.status === "REACH") {
-                badge.innerText = "聽牌 (差1個)";
-                badge.className = "status-badge reach";
-            } else {
-                badge.innerText = "進行中";
-                badge.className = "status-badge";
+                badge.innerText = "聽牌!"; badge.className = "status-badge reach";
             }
         });
 
-        // 管理員重置
+        // ★ 關鍵修復：收到重置訊號，強制重整頁面，回到輸入名字畫面
         socket.on('game_reset', () => {
-            alert("遊戲已重置，請重新加入！");
-            location.reload();
+            alert("遊戲已結束並重置，請重新加入！");
+            window.location.reload();
         });
-
     </script>
 </body>
 </html>
